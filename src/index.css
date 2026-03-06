@@ -1,0 +1,39 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Poppins:wght@300;400;500&display=swap');
+
+/* Import Tailwind v4 */
+@import "tailwindcss";
+
+/* Konfigurasi Tema Kustom (Pengganti tailwind.config.js) */
+@theme {
+  --color-primary: #A08061;
+  --color-secondary: #F5F5F5;
+  --color-dark: #333333;
+
+  --font-heading: "Playfair Display", serif;
+  --font-body: "Poppins", sans-serif;
+  --font-accent: "Great Vibes", cursive;
+}
+
+/* Base Styles */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    background-color: var(--color-secondary);
+    color: var(--color-dark);
+    font-family: var(--font-body);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}

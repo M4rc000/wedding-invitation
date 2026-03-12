@@ -1,7 +1,66 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaChevronDown, FaCheckCircle } from 'react-icons/fa';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase'; // Import koneksi database yang kita buat
 
 const RsvpWishes = () => {
+  // State untuk menyimpan inputan form
+  const [name, setName] = useState('');
+  const [attendance, setAttendance] = useState('');
+  const [message, setMessage] = useState('');
+  
+  // State untuk menyimpan daftar ucapan dari database
+  const [wishes, setWishes] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fungsi untuk mengambil data dari Firebase secara Real-Time
+  useEffect(() => {
+    const q = query(collection(db, "wishes"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const wishesData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setWishes(wishesData);
+    });
+
+    // Cleanup listener saat komponen di-unmount
+    return () => unsubscribe();
+  }, []);
+
+  // Fungsi saat tombol Kirim ditekan
+  const handleSubmit = async (e) => {
+    e.preventDefault(); // Mencegah halaman reload
+    
+    if (!name || !attendance || !message) {
+      alert("Mohon isi semua kolom yang tersedia ya.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Menyimpan data ke Firebase Firestore
+      await addDoc(collection(db, "wishes"), {
+        name: name,
+        attendance: attendance,
+        message: message,
+        createdAt: serverTimestamp()
+      });
+      
+      // Kosongkan form setelah berhasil dikirim
+      setName('');
+      setAttendance('');
+      setMessage('');
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      alert("Gagal mengirim ucapan. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Varian Animasi
   const fadeUp = {
     hidden: { opacity: 0, y: 40 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } }
@@ -34,6 +93,7 @@ const RsvpWishes = () => {
         
         {/* --- Form RSVP --- */}
         <motion.form 
+          onSubmit={handleSubmit}
           variants={staggerForm}
           initial="hidden"
           whileInView="visible"
@@ -44,6 +104,8 @@ const RsvpWishes = () => {
             <label className="block font-body text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-2 ml-1">Nama Anda</label>
             <input 
               type="text" 
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className="w-full bg-white border border-gray-200 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-xl p-4 font-body text-sm text-gray-700 transition-all outline-none shadow-sm placeholder:text-gray-300" 
               placeholder="Tuliskan nama lengkap Anda..." 
             />
@@ -53,8 +115,9 @@ const RsvpWishes = () => {
             <label className="block font-body text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-2 ml-1">Kehadiran</label>
             <div className="relative">
               <select 
-                defaultValue=""
-                className="w-full appearance-none bg-white border border-gray-200 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-xl p-4 pr-10 font-body text-sm text-gray-700 transition-all outline-none shadow-sm cursor-pointer invalid:text-gray-300"
+                value={attendance}
+                onChange={(e) => setAttendance(e.target.value)}
+                className={`w-full appearance-none bg-white border border-gray-200 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-xl p-4 pr-10 font-body text-sm transition-all outline-none shadow-sm cursor-pointer ${attendance === "" ? "text-gray-300" : "text-gray-700"}`}
               >
                 <option value="" disabled hidden>Apakah Anda akan hadir?</option>
                 <option value="Hadir" className="text-gray-700">Ya, Saya Akan Hadir</option>
@@ -69,6 +132,8 @@ const RsvpWishes = () => {
           <motion.div variants={itemField} className="mb-8">
             <label className="block font-body text-[10px] uppercase tracking-widest text-gray-400 font-semibold mb-2 ml-1">Pesan & Doa</label>
             <textarea 
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               className="w-full bg-white border border-gray-200 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 rounded-xl p-4 font-body text-sm text-gray-700 transition-all outline-none shadow-sm h-32 resize-none placeholder:text-gray-300" 
               placeholder="Berikan ucapan dan doa terbaik Anda untuk kedua mempelai..."
             ></textarea>
@@ -78,10 +143,11 @@ const RsvpWishes = () => {
             variants={itemField}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            type="button" 
-            className="w-full bg-primary text-white font-body py-4 rounded-xl hover:bg-[#8A6A4B] transition-all shadow-md flex justify-center items-center gap-2 font-medium tracking-wide"
+            type="submit" 
+            disabled={isSubmitting}
+            className="w-full bg-primary text-white font-body py-4 rounded-xl hover:bg-[#8A6A4B] transition-all shadow-md flex justify-center items-center gap-2 font-medium tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Kirim Ucapan
+            {isSubmitting ? 'Mengirim...' : 'Kirim Ucapan'}
           </motion.button>
         </motion.form>
 
@@ -91,43 +157,39 @@ const RsvpWishes = () => {
           className="no-scrollbar bg-white rounded-3xl shadow-[inset_0_2px_15px_rgba(0,0,0,0.03)] h-[500px] overflow-y-auto text-left border border-gray-200 relative"
         >
           {/* Header List Ucapan */}
-          {/* PERBAIKAN 2: Gunakan -top-[1px] dan beri padding px-6 di dalam header */}
           <div className="sticky -top-[1px] bg-white/95 backdrop-blur-md px-6 pt-6 pb-4 border-b border-gray-300 z-20 flex items-center shadow-sm justify-between rounded-t-3xl">
             <h3 className="font-heading text-lg text-dark">Pesan Termanis</h3>
-            <span className="bg-primary/10 text-primary text-[10px] font-semibold px-3 py-1 rounded-full">2 Pesan</span>
+            <span className="bg-primary/10 text-primary text-[10px] font-semibold px-3 py-1 rounded-full">
+              {wishes.length} Pesan
+            </span>
           </div>
 
-          {/* Wrapper untuk daftar pesan (Padding dipindah ke sini) */}
-          <div className="px-6 pt-2 pb-6">
-            <div className="mb-6">
-              <h4 className="font-accent text-xl text-primary flex items-center gap-2">
-                Keluarga Bapak Rudi 
-              </h4>
-              <p className="font-body text-[10px] text-gray-400 mb-2">Beberapa detik yang lalu</p>
-              <p className="font-body text-sm text-gray-600 bg-[#FAF8F5] p-3 rounded-tr-xl rounded-bl-xl rounded-br-xl shadow-sm border border-gray-50">
-                Selamat menempuh hidup baru! Semoga menjadi keluarga yang sakinah, mawaddah, dan warahmah. Tuhan memberkati selalu.
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="font-accent text-xl text-primary flex items-center gap-2">
-                Sarah Wijayanto 
-              </h4>
-              <p className="font-body text-[10px] text-gray-400 mb-2">2 jam yang lalu</p>
-              <p className="font-body text-sm text-gray-600 bg-[#FAF8F5] p-3 rounded-tr-xl rounded-bl-xl rounded-br-xl shadow-sm border border-gray-50">
-                Maaf banget belum bisa hadir karena ada dinas luar kota. Doa terbaik untuk kalian berdua ya, semoga acaranya lancar sampai hari H!
-              </p>
-            </div>
-            
-            <div className="mb-6">
-              <h4 className="font-accent text-xl text-primary flex items-center gap-2">
-                Budi Santoso 
-              </h4>
-              <p className="font-body text-[10px] text-gray-400 mb-2">5 jam yang lalu</p>
-              <p className="font-body text-sm text-gray-600 bg-[#FAF8F5] p-3 rounded-tr-xl rounded-bl-xl rounded-br-xl shadow-sm border border-gray-50">
-                Mantap! Akhirnya nikah juga bro. Sampai ketemu di lokasi ya!
-              </p>
-            </div>
+          {/* Wrapper untuk daftar pesan */}
+          <div className="px-6 pt-4 pb-6">
+            {wishes.length === 0 ? (
+              <p className="text-center font-body text-xs text-gray-400 py-10">Belum ada ucapan. Jadilah yang pertama!</p>
+            ) : (
+              wishes.map((wish) => (
+                <div key={wish.id} className="mb-6">
+                  <h4 className="font-accent text-xl text-primary flex items-center gap-2">
+                    {wish.name}
+                    {/* Kondisi untuk Icon/Badge Kehadiran */}
+                    {wish.attendance === "Hadir" ? (
+                      <FaCheckCircle className="text-green-500 text-[12px]" title="Hadir"/>
+                    ) : (
+                      <span className="text-red-400 text-[10px] font-body font-semibold border border-red-200 px-2 py-0.5 rounded-full ml-1">Absen</span>
+                    )}
+                  </h4>
+                  <p className="font-body text-[10px] text-gray-400 mb-2">
+                    {/* Mengubah format waktu serverTimestamp ke format lokal */}
+                    {wish.createdAt ? wish.createdAt.toDate().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : 'Baru saja'}
+                  </p>
+                  <p className="font-body text-sm text-gray-600 bg-[#FAF8F5] p-3 rounded-tr-xl rounded-bl-xl rounded-br-xl shadow-sm border border-gray-50 break-words">
+                    {wish.message}
+                  </p>
+                </div>
+              ))
+            )}
           </div>
         </motion.div>
 
